@@ -2,6 +2,7 @@ import os
 import boto3
 from datetime import date
 import requests
+import json  # Import json module
 
 def assume_role(role_arn, session_name):
     # Create a new STS client
@@ -85,7 +86,11 @@ def get_billed_resources():
     # Filter out resources with a cost of $0.00
     billed_resources = {k: v for k, v in dict0.items() if v > 0}
 
-    return billed_resources
+    # Print active resources in JSON format
+    print(f'Active Resources:-', json.dumps(resource_name, indent=4, sort_keys=True))
+
+    # Return both billed resources and resource names
+    return billed_resources, resource_name
 
 def lambda_handler(event, context):
     # Replace TELEGRAM_API_TOKEN with your actual Telegram API token
@@ -94,13 +99,18 @@ def lambda_handler(event, context):
     # Retrieve chat ID from environment variable
     TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-    # Retrieve billing information
-    billed_resources = get_billed_resources()
+    # Retrieve billing information and active resources
+    billed_resources, resource_names = get_billed_resources()
 
     # Prepare message to send to Telegram
     message = "Current Billed Resources of this month:\n\n"
     for resource, cost in billed_resources.items():
         message += f"{resource}: ${cost:.2f}\n"
+
+    # Add Active Resources section
+    message += "\nActive Resources:\n\n"
+    for resource in resource_names:
+        message += f"{resource}\n"
 
     # Send message to Telegram
     url = f'https://api.telegram.org/bot{TELEGRAM_API_TOKEN}/sendMessage'
@@ -112,7 +122,7 @@ def lambda_handler(event, context):
     response = requests.get(url, params=params)
     if response.status_code != 200:
         print(f"Failed to send message to Telegram. Status code: {response.status_code}")
+        return {"statusCode": response.status_code, "body": "Failed to send message to Telegram."}
     else:
         print("Message sent successfully to Telegram")
-
-    return {"statusCode": 200}
+        return {"statusCode": 200, "body": "Message sent successfully to Telegram."}
