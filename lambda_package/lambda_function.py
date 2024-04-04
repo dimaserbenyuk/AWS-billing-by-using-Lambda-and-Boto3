@@ -1,6 +1,5 @@
 import os
 import boto3
-import json
 from datetime import date
 import requests
 
@@ -28,7 +27,6 @@ def assume_role(role_arn, session_name):
 
 def get_billed_resources():
     role_arn = 'arn:aws:iam::420779746987:role/RoleCostExplorerAPI'
-    # Session name
     session_name = 'AssumedRoleSession'
 
     # Assume the IAM role
@@ -87,38 +85,34 @@ def get_billed_resources():
     # Filter out resources with a cost of $0.00
     billed_resources = {k: v for k, v in dict0.items() if v > 0}
 
-    return billed_resources, resource_name
+    return billed_resources
 
-TELEGRAM_API_TOKEN = os.environ.get('TELEGRAM_API_TOKEN')
-TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
+def lambda_handler(event, context):
+    # Replace TELEGRAM_API_TOKEN with your actual Telegram API token
+    TELEGRAM_API_TOKEN = os.getenv('TELEGRAM_API_TOKEN')
 
-def send_telegram_message(billed_resources, active_resources):
-    billed_message = "Current Billed Resources of this month:\n\n"
+    # Retrieve chat ID from environment variable
+    TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+
+    # Retrieve billing information
+    billed_resources = get_billed_resources()
+
+    # Prepare message to send to Telegram
+    message = "Current Billed Resources of this month:\n\n"
     for resource, cost in billed_resources.items():
-        billed_message += f"{resource}: ${cost:.2f}\n"
+        message += f"{resource}: ${cost:.2f}\n"
 
-    active_message = "Active Resources:\n\n"
-    for resource in active_resources:
-        active_message += f"{resource}\n"
-
-    message = billed_message + "\n" + active_message
-
+    # Send message to Telegram
     url = f'https://api.telegram.org/bot{TELEGRAM_API_TOKEN}/sendMessage'
     params = {
         'chat_id': TELEGRAM_CHAT_ID,
         'text': message,
         'parse_mode': 'Markdown'  # Specify MarkdownV2 parsing mode
     }
-
     response = requests.get(url, params=params)
     if response.status_code != 200:
         print(f"Failed to send message to Telegram. Status code: {response.status_code}")
     else:
-        print("Message sent successfully to Telegram.")
+        print("Message sent successfully to Telegram")
 
-def lambda_handler(event, context):
-    # Get billed resources and active resources
-    billed_resources, active_resources = get_billed_resources()
-
-    # Call send_telegram_message function to send the billed resources and active resources to Telegram
-    send_telegram_message(billed_resources, active_resources)
+    return {"statusCode": 200}
